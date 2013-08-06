@@ -217,6 +217,7 @@ module ActiveRecord
       ADAPTER_NAME = 'Vertica'
 
       NATIVE_DATABASE_TYPES = {
+        :primary_key => "int auto_increment PRIMARY KEY",
         :string      => { :name => "character varying", :limit => 255 },
         :text        => { :name => "text" },
         :integer     => { :name => "integer" },
@@ -372,7 +373,7 @@ module ActiveRecord
 
       # Does Vertica support finding primary key on non-Active Record tables?
       def supports_primary_key? #:nodoc:
-        false
+        true
       end
 
       # Enable standard-conforming strings if available.
@@ -381,7 +382,7 @@ module ActiveRecord
       end
 
       def supports_insert_with_returning?
-        true
+        false
       end
 
       def supports_ddl_transactions?
@@ -1100,9 +1101,9 @@ module ActiveRecord
           end
         end
 
-        # Returns the current ID of a table's sequence.
+        # Returns the current ID of a table's id.
         def last_insert_id(sequence_name) #:nodoc:
-          r = exec_query("SELECT currval('#{sequence_name}')", 'SQL')
+          r = exec_query("SELECT currval('id')", 'SQL')
           Integer(r.rows.first.first)
         end
 
