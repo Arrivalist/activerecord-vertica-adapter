@@ -952,6 +952,11 @@ module ActiveRecord
           super
         end
       end
+      
+      # Returns just a table's primary key
+      def primary_key(table)
+        'id'
+      end
 
       # Returns a SELECT DISTINCT clause for a given set of columns and a given ORDER BY clause.
       #
