@@ -203,14 +203,22 @@ module ActiveRecord
     #   <encoding></tt> call on the connection.
     class VerticaAdapter < AbstractAdapter
       class TableDefinition < ActiveRecord::ConnectionAdapters::TableDefinition
+        def text(*args)
+          custom_type(["text"] + args)
+        end
+
         def xml(*args)
-          options = args.extract_options!
-          column(args[0], 'xml', options)
+          custom_type(["xml"] + args)
         end
 
         def tsvector(*args)
+          custom_type(["ts_vector"] + args)
+        end
+
+        def custom_type(*args)
+          type = args.delete_at(0)
           options = args.extract_options!
-          column(args[0], 'tsvector', options)
+          column(args[0], type, options)
         end
       end
 
@@ -219,7 +227,7 @@ module ActiveRecord
       NATIVE_DATABASE_TYPES = {
         :primary_key => "integer",
         :string      => { :name => "character varying", :limit => 255 },
-        :text        => { :name => "text" },
+        :text        => { :name => "varchar" },
         :integer     => { :name => "integer" },
         :float       => { :name => "float" },
         :decimal     => { :name => "decimal" },
@@ -246,6 +254,10 @@ module ActiveRecord
 
       def supports_index_sort_order?
         true
+      end
+
+      def add_index(table_name, column_name, options = {})
+        # no op - feature not supported
       end
 
       class StatementPool < ConnectionAdapters::StatementPool
@@ -573,18 +585,19 @@ module ActiveRecord
 
       # Executes an INSERT query and returns the new record's ID
       def insert_sql(sql, name = nil, pk = nil, id_value = nil, sequence_name = nil)
-        unless pk
-          # Extract the table from the insert sql. Yuck.
-          table_ref = extract_table_ref_from_insert_sql(sql)
-          # FIXME: Vertica doesn't have PK's
-          pk = primary_key(table_ref) if table_ref
-        end
-
-        if pk
-          select_value("#{sql} RETURNING #{quote_column_name(pk)}")
-        else
-          super
-        end
+        # note: Vertica doesn't have PK's
+        super
+        #unless pk
+        #  # Extract the table from the insert sql. Yuck.
+        #  table_ref = extract_table_ref_from_insert_sql(sql)
+        #  pk = primary_key(table_ref) if table_ref
+        #end
+        #
+        #if pk
+        #  select_value("#{sql} RETURNING #{quote_column_name(pk)}")
+        #else
+        #  super
+        #end
       end
       alias :create :insert
 
@@ -674,15 +687,13 @@ module ActiveRecord
       alias :exec_update :exec_delete
 
       def sql_for_insert(sql, pk, id_value, sequence_name, binds)
-        unless pk
-          # Extract the table from the insert sql. Yuck.
-          table_ref = extract_table_ref_from_insert_sql(sql)
-          # FIXME: Vertica doesn't have PK's
-          pk = primary_key(table_ref) if table_ref
-        end
-
-        sql = "#{sql} RETURNING #{quote_column_name(pk)}" if pk
-
+        # note: Vertica doesn't have PK's
+        #unless pk
+        #  # Extract the table from the insert sql. Yuck.
+        #  table_ref = extract_table_ref_from_insert_sql(sql)
+        #  pk = primary_key(table_ref) if table_ref
+        #end
+        #sql = "#{sql} RETURNING #{quote_column_name(pk)}" if pk
         [sql, binds]
       end
 
@@ -929,15 +940,14 @@ module ActiveRecord
           # PostgreSQL doesn't support limits on binary (bytea) columns.
           # The hard limit is 1Gb, because of a 32-bit size field, and TOAST.
           case limit
-          when nil, 0..0x3fffffff; super(type)
-          else raise(ActiveRecordError, "No binary type has byte size #{limit}.")
+            when nil, 0..0x3fffffff; super(type)
+            else raise(ActiveRecordError, "No binary type has byte size #{limit}.")
           end
         when 'text'
-          # PostgreSQL doesn't support limits on text columns.
-          # The hard limit is 1Gb, according to section 8.3 in the manual.
+          # note: adapted for Vertica
           case limit
-          when nil, 0..0x3fffffff; super(type)
-          else raise(ActiveRecordError, "The limit on text can be at most 1GB - 1byte.")
+            when nil, 0..32767; "varchar"
+            else raise(ActiveRecordError, "The limit on varchar in Vertica can be at most 32k.")
           end
         when 'integer'
           return 'integer' unless limit
