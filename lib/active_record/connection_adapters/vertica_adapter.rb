@@ -225,7 +225,7 @@ module ActiveRecord
       ADAPTER_NAME = 'Vertica'
 
       NATIVE_DATABASE_TYPES = {
-        :primary_key => "integer",
+        :primary_key => "identity",
         :string      => { :name => "character varying", :limit => 255 },
         :text        => { :name => "varchar" },
         :integer     => { :name => "integer" },
