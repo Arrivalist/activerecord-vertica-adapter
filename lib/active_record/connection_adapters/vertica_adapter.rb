@@ -204,21 +204,18 @@ module ActiveRecord
     class VerticaAdapter < AbstractAdapter
       class TableDefinition < ActiveRecord::ConnectionAdapters::TableDefinition
         def text(*args)
-          custom_type(["text"] + args)
+          options = args.extract_options!
+          options[:limit] = 65000
+          column(args[0], 'text', options)
         end
-
         def xml(*args)
-          custom_type(["xml"] + args)
+          options = args.extract_options!
+          column(args[0], 'xml', options)
         end
 
         def tsvector(*args)
-          custom_type(["ts_vector"] + args)
-        end
-
-        def custom_type(*args)
-          type = args.delete_at(0)
           options = args.extract_options!
-          column(args[0], type, options)
+          column(args[0], 'tsvector', options)
         end
       end
 
@@ -226,8 +223,8 @@ module ActiveRecord
 
       NATIVE_DATABASE_TYPES = {
         :primary_key => "identity",
-        :string      => { :name => "character varying", :limit => 255 },
-        :text        => { :name => "varchar" },
+        :string      => { :name => "varchar", :limit => 255 },
+        :text        => { :name => "varchar", :limit => 65000 },
         :integer     => { :name => "integer" },
         :float       => { :name => "float" },
         :decimal     => { :name => "decimal" },
@@ -946,8 +943,8 @@ module ActiveRecord
         when 'text'
           # note: adapted for Vertica
           case limit
-            when nil, 0..32767; "varchar"
-            else raise(ActiveRecordError, "The limit on varchar in Vertica can be at most 32k.")
+            when nil, 0..65000; "varchar(#{limit})"
+            else raise(ActiveRecordError, "The limit on varchar in Vertica can be at most 65000 bytes.")
           end
         when 'integer'
           return 'integer' unless limit
