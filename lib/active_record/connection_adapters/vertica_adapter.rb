@@ -1111,6 +1111,9 @@ module ActiveRecord
           elsif @local_tz
             execute("SET time zone '#{@local_tz}'", 'SCHEMA')
           end
+
+          execute("SET SESSION AUTOCOMMIT TO  ON")
+
         end
 
         # Returns the current ID of a table's id.
