@@ -1,5 +1,1 @@
-module ArJdbc
-  module Vertica
-    VERSION = "0.1"
-  end
-end
+require 'active_record/connection_adapters/vertica_adapter'
