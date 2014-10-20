@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |gem|
   gem.name          = 'activerecord-vertica-adapter'
-  gem.version       = '0.0.2'
+  gem.version       = '0.0.3'
   gem.authors       = 'Dmitry Vorotilin'
   gem.email         = 'd.vorotilin@gmail.com'
   gem.description   = 'ActiveRecord adapter for Vertica database'
