@@ -329,7 +329,7 @@ module ActiveRecord
 
         # @local_tz is initialized as nil to avoid warnings when connect tries to use it
         @local_tz = nil
-        @table_alias_length = nil
+        @table_alias_length = 128
 
         connect
         @statements = StatementPool.new @connection,
@@ -410,7 +410,7 @@ module ActiveRecord
 
       # Returns the configured supported identifier length supported by PostgreSQL
       def table_alias_length
-        @table_alias_length ||= query('SHOW max_identifier_length')[0][0].to_i
+        @table_alias_length ||= 128
       end
 
       # QUOTING ==================================================
