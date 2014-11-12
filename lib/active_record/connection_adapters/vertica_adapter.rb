@@ -601,19 +601,30 @@ module ActiveRecord
       # create a 2D array representing the result set
       def result_as_array(res) #:nodoc:
 
+        # CJR 11-12-14 We need to convert everything other than string because
+        # everything is coming back as string (we are not converting char(8) or varchar(9))
+        convert_types = {boolean: 5, integer: 6, float: 7, numeric: 16, date: 10, time: 11, timestamp: 12}
+
         # check if we have any binary column and if they need escaping
         ftypes = Array.new(res.nfields) do |i|
           [i, res.ftype(i)]
         end
 
         rows = res.values
+
+
         return rows unless ftypes.any? { |_, x|
-          x == BYTEA_COLUMN_TYPE_OID || x == MONEY_COLUMN_TYPE_OID
+          convert_types.values.include?(x) || x == BYTEA_COLUMN_TYPE_OID || x == MONEY_COLUMN_TYPE_OID
         }
 
         typehash = ftypes.group_by { |_, type| type }
         binaries = typehash[BYTEA_COLUMN_TYPE_OID] || []
         monies   = typehash[MONEY_COLUMN_TYPE_OID] || []
+        integers = typehash[6] || []
+        floats   = typehash[16] || []
+        floats   += typehash[7] unless typehash[7].nil?
+        dates    = typehash[10] || []
+        # CJR 11-12-14 not converting boolean, time and timestamp because we don't use them
 
         rows.each do |row|
           # unescape string passed BYTEA field (OID == 17)
@@ -621,6 +632,15 @@ module ActiveRecord
             row[index] = unescape_bytea(row[index])
           end
 
+          integers.each do |index, _|
+            row[index] = row[index].to_i
+          end
+          floats.each do |index, _|
+            row[index] = row[index].to_f
+          end
+          dates.each do |index, _|
+            row[index] = Date.parse(row[index])
+          end
           # If this is a money type column and there are any currency symbols,
           # then strip them off. Indeed it would be prettier to do this in
           # PostgreSQLColumn.string_to_decimal but would break form input
@@ -959,7 +979,7 @@ module ActiveRecord
           super
         end
       end
-      
+
       # Returns just a table's primary key
       def primary_key(table)
         'id'
