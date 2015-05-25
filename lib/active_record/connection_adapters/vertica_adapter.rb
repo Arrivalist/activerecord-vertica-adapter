@@ -907,6 +907,18 @@ module ActiveRecord
         execute add_column_sql
       end
 
+      def remove_column(table_name, *column_names)
+        if column_names.flatten!
+          message = 'Passing array to remove_columns is deprecated, please use ' +
+              'multiple arguments, like: `remove_columns(:posts, :foo, :bar)`'
+          ActiveSupport::Deprecation.warn message, caller
+        end
+
+        columns_for_remove(table_name, *column_names).each do |column_name|
+          execute "ALTER TABLE #{quote_table_name(table_name)} DROP #{column_name} CASCADE"
+        end
+      end
+
       # Changes the column of a table.
       def change_column(table_name, column_name, type, options = {})
         clear_cache!
