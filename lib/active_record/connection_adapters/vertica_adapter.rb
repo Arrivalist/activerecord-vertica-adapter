@@ -775,8 +775,8 @@ module ActiveRecord
             " OWNER = \"#{value}\""
           when :template
             " TEMPLATE = \"#{value}\""
-          when :encoding
-            " ENCODING = '#{value}'"
+          # when :encoding
+          #   " ENCODING = '#{value}'"
           when :tablespace
             " TABLESPACE = \"#{value}\""
           when :connection_limit
@@ -1116,9 +1116,9 @@ module ActiveRecord
         # Configures the encoding, verbosity, schema search path, and time zone of the connection.
         # This is called by #connect and should not be called manually.
         def configure_connection
-          if @config[:encoding]
-            @connection.set_client_encoding(@config[:encoding])
-          end
+          # if @config[:encoding]
+          #   @connection.set_client_encoding(@config[:encoding])
+          # end
           self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
 
           # Use standard-conforming strings if available so we don't have to do the E'...' dance.
