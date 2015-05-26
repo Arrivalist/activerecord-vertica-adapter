@@ -767,7 +767,7 @@ module ActiveRecord
       #   create_database config[:database], config
       #   create_database 'foo_development', :encoding => 'unicode'
       def create_database(name, options = {})
-        options = options.reverse_merge(:encoding => "utf8")
+        # options = options.reverse_merge(:encoding => "utf8")
 
         option_string = options.symbolize_keys.sum do |key, value|
           case key
