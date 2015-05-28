@@ -25,6 +25,8 @@ module ActiveRecord
 
       # The postgres drivers don't allow the creation of an unconnected PGconn object,
       # so just pass a nil connection object for the time being.
+      # The order the options are passed to the ::connect method. (in pg/connection.rb)
+      #CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password]
       ConnectionAdapters::VerticaAdapter.new(nil, logger, [host, port, nil, nil, database, username, password], config)
     end
   end
@@ -797,10 +799,11 @@ module ActiveRecord
         execute "DROP DATABASE IF EXISTS #{quote_table_name(name)}"
       end
 
-      # Returns the list of all tables in the schema search path or a specified schema.
+      # Returns the list of all tables in the specified or current schema, if none specified.
       def tables(name = nil)
         query(<<-SQL, 'SCHEMA').map { |row| row[0] }
-          SELECT table_name FROM tables;
+          SELECT table_name FROM tables
+          WHERE table_schema = '#{current_schema}';
         SQL
       end
 
@@ -808,13 +811,7 @@ module ActiveRecord
       # If the schema is not specified as part of +name+ then it will only find tables within
       # the current schema (regardless of permissions to access tables in other schemas)
       def table_exists?(name)
-        np = name.split('.')
-        if np.size > 1
-          schema = np.first
-          name = np.last
-        else
-          schema = current_schema
-        end
+        schema, name = get_schema_and_name(name)
         exec_query(<<-SQL, 'SCHEMA').rows.first[0].to_i > 0
           SELECT COUNT(*)
           FROM tables
@@ -1177,16 +1174,18 @@ module ActiveRecord
         #   ORDER BY column.num
         #
         # If the table name is not prefixed with a schema, the database will
-        # take the first match from the schema search path.
+        # use the current schema
         #
         # Query implementation notes:
         #  - format_type includes the column size constraint, e.g. varchar(50)
         #  - ::regclass is a function that gives the id for a table name
         def column_definitions(table_name) #:nodoc:
+          schema, name = get_schema_and_name(table_name)
           exec_query(<<-end_sql, 'SCHEMA').rows
             SELECT column_name, data_type, column_default, is_nullable
             FROM columns
-            WHERE table_name = '#{table_name}'
+            WHERE table_name = '#{name}'
+            AND table_schema = '#{schema}'
           end_sql
         end
 
@@ -1208,6 +1207,18 @@ module ActiveRecord
         def table_definition
           TableDefinition.new(self)
         end
+
+        def get_schema_and_name(name)
+          np = name.split('.')
+          if np.size > 1
+            schema = np.first
+            name = np.last
+          else
+            schema = current_schema
+          end
+          [schema, name]
+        end
+
     end
   end
 end
