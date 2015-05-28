@@ -806,12 +806,20 @@ module ActiveRecord
 
       # Returns true if table exists.
       # If the schema is not specified as part of +name+ then it will only find tables within
-      # the current schema search path (regardless of permissions to access tables in other schemas)
+      # the current schema (regardless of permissions to access tables in other schemas)
       def table_exists?(name)
+        np = name.split('.')
+        if np.size > 1
+          schema = np.first
+          name = np.last
+        else
+          schema = current_schema
+        end
         exec_query(<<-SQL, 'SCHEMA').rows.first[0].to_i > 0
           SELECT COUNT(*)
           FROM tables
           WHERE table_name = '#{name}'
+          AND table_schema = '#{schema}'
         SQL
       end
 
