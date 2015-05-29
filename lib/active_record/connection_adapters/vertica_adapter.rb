@@ -483,13 +483,13 @@ module ActiveRecord
       # - schema_name."table.name"
       # - "schema.name".table_name
       # - "schema.name"."table.name"
-      def quote_table_name(name, should_add_schema=true)
+      def quote_table_name(name, should_add_schema=false)
         schema, name_part = extract_pg_identifier_from_name(name.to_s)
 
         if !name_part && !should_add_schema
           quote_column_name(schema)
         else
-          if !name_part
+          if !name_part && should_add_schema
             table_name = schema
             schema = current_schema
           else
@@ -528,12 +528,12 @@ module ActiveRecord
 
       def disable_referential_integrity #:nodoc:
         if supports_disable_referential_integrity? then
-          execute(tables.collect { |name| "ALTER TABLE #{quote_table_name(name)} DISABLE TRIGGER ALL" }.join(";"))
+          execute(tables.collect { |name| "ALTER TABLE #{quote_table_name(name, true)} DISABLE TRIGGER ALL" }.join(";"))
         end
         yield
       ensure
         if supports_disable_referential_integrity? then
-          execute(tables.collect { |name| "ALTER TABLE #{quote_table_name(name)} ENABLE TRIGGER ALL" }.join(";"))
+          execute(tables.collect { |name| "ALTER TABLE #{quote_table_name(name, true)} ENABLE TRIGGER ALL" }.join(";"))
         end
       end
 
@@ -810,7 +810,7 @@ module ActiveRecord
       # Example:
       #   drop_table 'cjo_gss_dev.s1_rmonths'
       def drop_table(name) #:nodoc:
-        execute "DROP TABLE IF EXISTS #{quote_table_name(name)}"
+        execute "DROP TABLE IF EXISTS #{quote_table_name(name, true)}"
       end
 
       # Returns the list of all tables in the specified or current schema, if none specified.
@@ -913,14 +913,14 @@ module ActiveRecord
       #   rename_table('octopuses', 'octopi')
       def rename_table(name, new_name)
         clear_cache!
-        execute "ALTER TABLE #{quote_table_name(name)} RENAME TO #{quote_table_name(new_name)}"
+        execute "ALTER TABLE #{quote_table_name(name, true)} RENAME TO #{quote_table_name(new_name, true)}"
       end
 
       # Adds a new column to the named table.
       # See TableDefinition#column for details of the options you can use.
       def add_column(table_name, column_name, type, options = {})
         clear_cache!
-        add_column_sql = "ALTER TABLE #{quote_table_name(table_name)} ADD COLUMN #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
+        add_column_sql = "ALTER TABLE #{quote_table_name(table_name, true)} ADD COLUMN #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
         add_column_options!(add_column_sql, options)
 
         execute add_column_sql
@@ -929,7 +929,7 @@ module ActiveRecord
       # Changes the column of a table.
       def change_column(table_name, column_name, type, options = {})
         clear_cache!
-        quoted_table_name = quote_table_name(table_name)
+        quoted_table_name = quote_table_name(table_name, true)
 
         execute "ALTER TABLE #{quoted_table_name} ALTER COLUMN #{quote_column_name(column_name)} TYPE #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
 
@@ -940,29 +940,29 @@ module ActiveRecord
       # Changes the default value of a table column.
       def change_column_default(table_name, column_name, default)
         clear_cache!
-        execute "ALTER TABLE #{quote_table_name(table_name)} ALTER COLUMN #{quote_column_name(column_name)} SET DEFAULT #{quote(default)}"
+        execute "ALTER TABLE #{quote_table_name(table_name, true)} ALTER COLUMN #{quote_column_name(column_name)} SET DEFAULT #{quote(default)}"
       end
 
       def change_column_null(table_name, column_name, null, default = nil)
         clear_cache!
         unless null || default.nil?
-          execute("UPDATE #{quote_table_name(table_name)} SET #{quote_column_name(column_name)}=#{quote(default)} WHERE #{quote_column_name(column_name)} IS NULL")
+          execute("UPDATE #{quote_table_name(table_name, true)} SET #{quote_column_name(column_name)}=#{quote(default)} WHERE #{quote_column_name(column_name)} IS NULL")
         end
-        execute("ALTER TABLE #{quote_table_name(table_name)} ALTER #{quote_column_name(column_name)} #{null ? 'DROP' : 'SET'} NOT NULL")
+        execute("ALTER TABLE #{quote_table_name(table_name, true)} ALTER #{quote_column_name(column_name)} #{null ? 'DROP' : 'SET'} NOT NULL")
       end
 
       # Renames a column in a table.
       def rename_column(table_name, column_name, new_column_name)
         clear_cache!
-        execute "ALTER TABLE #{quote_table_name(table_name)} RENAME COLUMN #{quote_column_name(column_name)} TO #{quote_column_name(new_column_name)}"
+        execute "ALTER TABLE #{quote_table_name(table_name, true)} RENAME COLUMN #{quote_column_name(column_name)} TO #{quote_column_name(new_column_name)}"
       end
 
       def remove_index!(table_name, index_name) #:nodoc:
-        execute "DROP INDEX #{quote_table_name(index_name)}"
+        execute "DROP INDEX #{quote_table_name(index_name, true)}"
       end
 
       def rename_index(table_name, old_name, new_name)
-        execute "ALTER INDEX #{quote_column_name(old_name)} RENAME TO #{quote_table_name(new_name)}"
+        execute "ALTER INDEX #{quote_column_name(old_name)} RENAME TO #{quote_column_name(new_name)}"
       end
 
       def index_name_length
@@ -1223,14 +1223,9 @@ module ActiveRecord
         end
 
         def get_schema_and_name(name)
-          np = name.split('.')
-          if np.size > 1
-            schema = np.first
-            name = np.last
-          else
-            schema = current_schema
-          end
-          [schema, name]
+          schema, table = Utils.extract_schema_and_table(name)
+          schema = current_schema if schema.nil?
+          [schema, table]
         end
 
     end
