@@ -470,7 +470,7 @@ module ActiveRecord
         end
       end
 
-      # Quotes strings for use in SQL input.
+      # Quotes strings for use in SQL input. Adds the current_schema if not specified when should_add_schema is true.
       def quote_string(s) #:nodoc:
         @connection.escape(s)
       end
@@ -483,13 +483,18 @@ module ActiveRecord
       # - schema_name."table.name"
       # - "schema.name".table_name
       # - "schema.name"."table.name"
-      def quote_table_name(name)
+      def quote_table_name(name, should_add_schema=true)
         schema, name_part = extract_pg_identifier_from_name(name.to_s)
 
-        unless name_part
+        if !name_part && !should_add_schema
           quote_column_name(schema)
         else
-          table_name, name_part = extract_pg_identifier_from_name(name_part)
+          if !name_part
+            table_name = schema
+            schema = current_schema
+          else
+            table_name, name_part = extract_pg_identifier_from_name(name_part)
+          end
           "#{quote_column_name(schema)}.#{quote_column_name(table_name)}"
         end
       end
@@ -788,7 +793,7 @@ module ActiveRecord
           end
         end
 
-        execute "CREATE DATABASE #{quote_table_name(name)}#{option_string}"
+        execute "CREATE DATABASE #{quote_table_name(name, false)}#{option_string}"
       end
 
       # Drops a PostgreSQL database.
@@ -796,7 +801,16 @@ module ActiveRecord
       # Example:
       #   drop_database 'matt_development'
       def drop_database(name) #:nodoc:
-        execute "DROP DATABASE IF EXISTS #{quote_table_name(name)}"
+        execute "DROP DATABASE IF EXISTS #{quote_table_name(name, false)}"
+      end
+
+      # Drops a PostgreSQL table.
+      # If the schema is not specified as part of +name+ then it will use the current schema
+      #
+      # Example:
+      #   drop_table 'cjo_gss_dev.s1_rmonths'
+      def drop_table(name) #:nodoc:
+        execute "DROP TABLE IF EXISTS #{quote_table_name(name)}"
       end
 
       # Returns the list of all tables in the specified or current schema, if none specified.
