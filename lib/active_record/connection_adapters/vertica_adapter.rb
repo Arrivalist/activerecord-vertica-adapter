@@ -225,7 +225,7 @@ module ActiveRecord
 
       NATIVE_DATABASE_TYPES = {
         :primary_key => "identity primary key",
-        :non_inc_pk  => "primary key",
+        :non_inc_pk  => "integer primary key",
         :string      => { :name => "varchar", :limit => 255 },
         :text        => { :name => "varchar", :limit => 65000 },
         :integer     => { :name => "integer" },
