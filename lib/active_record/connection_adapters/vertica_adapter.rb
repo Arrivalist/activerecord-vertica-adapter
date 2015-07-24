@@ -916,10 +916,7 @@ module ActiveRecord
       # See TableDefinition#column for details of the options you can use.
       def add_column(table_name, column_name, type, options = {})
         clear_cache!
-        add_column_sql = "ALTER TABLE #{quote_table_name(table_name, true)} ADD COLUMN #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
-        add_column_options!(add_column_sql, options)
-
-        execute add_column_sql
+        super
       end
 
       # Changes the column of a table.
