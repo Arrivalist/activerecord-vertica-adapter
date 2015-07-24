@@ -853,7 +853,7 @@ module ActiveRecord
       def columns(table_name, name = nil)
         # Limit, precision, and scale are all handled by the superclass.
         column_definitions(table_name).collect do |column_name, type, default, null|
-          VerticaColumn.new(column_name, default, type, null == 't')
+          VerticaColumn.new(column_name, default, self.lookup_cast_type(type), null == 't')
         end
       end
 
