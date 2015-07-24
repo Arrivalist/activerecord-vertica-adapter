@@ -685,10 +685,6 @@ module ActiveRecord
         end
       end
 
-      def substitute_at(column, index)
-        Arel::Nodes::BindParam.new "$#{index + 1}"
-      end
-
       def exec_query(sql, name = 'SQL', binds = [])
         log(sql, name, binds) do
           result = binds.empty? ? exec_no_cache(sql, binds) :
