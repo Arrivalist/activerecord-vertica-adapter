@@ -729,7 +729,7 @@ module ActiveRecord
 
       # Commits a transaction.
       def commit_db_transaction
-        execute "COMMIT"
+        execute "COMMIT" unless outside_transaction?
       end
 
       # Aborts a transaction.
