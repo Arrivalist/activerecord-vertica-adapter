@@ -805,8 +805,8 @@ module ActiveRecord
       #
       # Example:
       #   drop_table 'cjo_gss_dev.s1_rmonths'
-      def drop_table(name) #:nodoc:
-        execute "DROP TABLE IF EXISTS #{quote_table_name(name, true)}"
+      def drop_table(table_name, options = {}) #:nodoc:
+        execute "DROP TABLE IF EXISTS #{quote_table_name(table_name, true)}"
       end
 
       # Returns the list of all tables in the specified or current schema, if none specified.
