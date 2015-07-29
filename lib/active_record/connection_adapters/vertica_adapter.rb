@@ -734,7 +734,7 @@ module ActiveRecord
 
       # Aborts a transaction.
       def rollback_db_transaction
-        execute "ROLLBACK"
+        execute "ROLLBACK" unless outside_transaction?
       end
 
       def outside_transaction?
