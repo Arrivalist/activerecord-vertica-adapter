@@ -741,16 +741,16 @@ module ActiveRecord
         @connection.transaction_status == PGconn::PQTRANS_IDLE
       end
 
-      def create_savepoint
-        execute("SAVEPOINT #{current_savepoint_name}")
+      def create_savepoint(name = nil)
+        execute("SAVEPOINT #{name}")
       end
 
-      def rollback_to_savepoint
-        execute("ROLLBACK TO SAVEPOINT #{current_savepoint_name}")
+      def rollback_to_savepoint(name = nil)
+        execute("ROLLBACK TO SAVEPOINT #{name}")
       end
 
-      def release_savepoint
-        execute("RELEASE SAVEPOINT #{current_savepoint_name}")
+      def release_savepoint(name = nil)
+        execute("RELEASE SAVEPOINT #{name}")
       end
 
       # SCHEMA STATEMENTS ========================================
