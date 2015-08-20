@@ -742,15 +742,15 @@ module ActiveRecord
       end
 
       def create_savepoint(name = nil)
-        execute("SAVEPOINT #{name}")
+        execute("SAVEPOINT #{name}") unless outside_transaction?
       end
 
       def rollback_to_savepoint(name = nil)
-        execute("ROLLBACK TO SAVEPOINT #{name}")
+        execute("ROLLBACK TO SAVEPOINT #{name}") unless outside_transaction?
       end
 
       def release_savepoint(name = nil)
-        execute("RELEASE SAVEPOINT #{name}")
+        execute("RELEASE SAVEPOINT #{name}") unless outside_transaction?
       end
 
       # SCHEMA STATEMENTS ========================================
