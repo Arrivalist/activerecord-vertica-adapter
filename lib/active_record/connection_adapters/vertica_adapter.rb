@@ -1043,6 +1043,15 @@ module ActiveRecord
       end
 
       protected
+        def extract_limit(sql_type) # :nodoc:
+          case sql_type
+            when /^int/i
+              8
+            when /\((.*)\)/
+              $1.to_i
+          end
+        end
+
         # FIXME: Double check this on Vertica
         # Returns the version of the connected PostgreSQL server.
         def postgresql_version
