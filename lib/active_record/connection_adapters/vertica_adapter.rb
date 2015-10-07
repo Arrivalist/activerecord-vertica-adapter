@@ -950,6 +950,11 @@ module ActiveRecord
         execute "ALTER TABLE #{quote_table_name(table_name, true)} RENAME COLUMN #{quote_column_name(column_name)} TO #{quote_column_name(new_column_name)}"
       end
 
+      def remove_column(table_name, column_name, type = nil, options = {})
+        clear_cache!
+        execute "ALTER TABLE #{quote_table_name(table_name)} DROP COLUMN #{quote_column_name(column_name)} CASCADE"
+      end
+
       def remove_index!(table_name, index_name) #:nodoc:
         execute "DROP INDEX #{quote_table_name(index_name, true)}"
       end
