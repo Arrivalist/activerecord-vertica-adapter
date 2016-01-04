@@ -15,6 +15,6 @@ Gem::Specification.new do |gem|
   gem.test_files    = gem.files.grep(%r{^test/})
   gem.require_paths = ['lib']
 
-  gem.add_runtime_dependency 'activerecord', '~> 4.2'
+  gem.add_runtime_dependency 'activerecord', '~> 5.0.0.beta1'
   gem.add_runtime_dependency 'pg'
 end
