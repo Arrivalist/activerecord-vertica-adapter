@@ -584,7 +584,7 @@ module ActiveRecord
 
       # Executes a SELECT query and returns an array of rows. Each row is an
       # array of field values.
-      def select_rows(sql, name = nil)
+      def select_rows(sql, name = nil, binds = [])
         select_raw(sql, name).last
       end
 
@@ -685,14 +685,9 @@ module ActiveRecord
         end
       end
 
-      def substitute_at(column, index)
-        Arel::Nodes::BindParam.new "$#{index + 1}"
-      end
-
       def exec_query(sql, name = 'SQL', binds = [])
         log(sql, name, binds) do
-          result = binds.empty? ? exec_no_cache(sql, binds) :
-                                  exec_cache(sql, binds)
+          result = without_prepared_statement?(binds) ? exec_no_cache(sql, binds) : exec_cache(sql, binds)
 
           ret = ActiveRecord::Result.new(result.fields, result_as_array(result))
           result.clear
@@ -734,28 +729,28 @@ module ActiveRecord
 
       # Commits a transaction.
       def commit_db_transaction
-        execute "COMMIT"
+        execute "COMMIT" unless outside_transaction?
       end
 
       # Aborts a transaction.
       def rollback_db_transaction
-        execute "ROLLBACK"
+        execute "ROLLBACK" unless outside_transaction?
       end
 
       def outside_transaction?
         @connection.transaction_status == PGconn::PQTRANS_IDLE
       end
 
-      def create_savepoint
-        execute("SAVEPOINT #{current_savepoint_name}")
+      def create_savepoint(name = nil)
+        execute("SAVEPOINT #{name}") unless outside_transaction?
       end
 
-      def rollback_to_savepoint
-        execute("ROLLBACK TO SAVEPOINT #{current_savepoint_name}")
+      def rollback_to_savepoint(name = nil)
+        execute("ROLLBACK TO SAVEPOINT #{name}") unless outside_transaction?
       end
 
-      def release_savepoint
-        execute("RELEASE SAVEPOINT #{current_savepoint_name}")
+      def release_savepoint(name = nil)
+        execute("RELEASE SAVEPOINT #{name}") unless outside_transaction?
       end
 
       # SCHEMA STATEMENTS ========================================
@@ -810,8 +805,8 @@ module ActiveRecord
       #
       # Example:
       #   drop_table 'cjo_gss_dev.s1_rmonths'
-      def drop_table(name) #:nodoc:
-        execute "DROP TABLE IF EXISTS #{quote_table_name(name, true)}"
+      def drop_table(table_name, options = {}) #:nodoc:
+        execute "DROP TABLE IF EXISTS #{quote_table_name(table_name, true)}"
       end
 
       # Returns the list of all tables in the specified or current schema, if none specified.
@@ -853,7 +848,7 @@ module ActiveRecord
       def columns(table_name, name = nil)
         # Limit, precision, and scale are all handled by the superclass.
         column_definitions(table_name).collect do |column_name, type, default, null|
-          VerticaColumn.new(column_name, default, type, null == 't')
+          VerticaColumn.new(column_name, default, self.lookup_cast_type(type), null == 't')
         end
       end
 
@@ -921,10 +916,7 @@ module ActiveRecord
       # See TableDefinition#column for details of the options you can use.
       def add_column(table_name, column_name, type, options = {})
         clear_cache!
-        add_column_sql = "ALTER TABLE #{quote_table_name(table_name, true)} ADD COLUMN #{quote_column_name(column_name)} #{type_to_sql(type, options[:limit], options[:precision], options[:scale])}"
-        add_column_options!(add_column_sql, options)
-
-        execute add_column_sql
+        super
       end
 
       # Changes the column of a table.
@@ -1174,12 +1166,6 @@ module ActiveRecord
         def last_insert_id(sequence_name) #:nodoc:
           r = exec_query("SELECT currval('id')", 'SQL')
           Integer(r.rows.first.first)
-        end
-
-        # Executes a SELECT query and returns the results, performing any data type
-        # conversions that are required to be performed here instead of in PostgreSQLColumn.
-        def select(sql, name = nil, binds = [])
-          exec_query(sql, name, binds).to_a
         end
 
         def select_raw(sql, name = nil)
