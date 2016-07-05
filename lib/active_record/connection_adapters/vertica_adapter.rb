@@ -610,7 +610,7 @@ module ActiveRecord
 
         # CJR 11-12-14 We need to convert everything other than string because
         # everything is coming back as string (we are not converting char(8) or varchar(9))
-        convert_types = {boolean: 5, integer: 6, float: 7, numeric: 16, date: 10, time: 11, timestamp: 12}
+        convert_types = {boolean: 5, integer: 6, float: 7, string:9, numeric: 16, date: 10, time: 11, timestamp: 12}
 
         # check if we have any binary column and if they need escaping
         ftypes = Array.new(res.nfields) do |i|
@@ -630,6 +630,7 @@ module ActiveRecord
         integers = typehash[6] || []
         floats   = typehash[16] || []
         floats   += typehash[7] unless typehash[7].nil?
+	strings  = typehash[9] || []
         dates    = typehash[10] || []
         # CJR 11-12-14 not converting boolean, time and timestamp because we don't use them
 
@@ -648,6 +649,9 @@ module ActiveRecord
           dates.each do |index, _|
             row[index] = Date.parse(row[index])
           end
+	  strings.each do |index, _|
+	    row[index] = row[index].force_encoding('UTF-8')
+	  row
           # If this is a money type column and there are any currency symbols,
           # then strip them off. Indeed it would be prettier to do this in
           # PostgreSQLColumn.string_to_decimal but would break form input
