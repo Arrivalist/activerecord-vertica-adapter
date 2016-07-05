@@ -261,7 +261,7 @@ module ActiveRecord
       end
 
       class StatementPool < ConnectionAdapters::StatementPool
-        def initialize(connection, max)
+        def initialize(max)
           super
           @counter = 0
           @cache   = Hash.new { |h,pid| h[pid] = {} }
