@@ -4,7 +4,7 @@ require 'active_record/connection_adapters/statement_pool'
 require 'arel/visitors/bind_visitor'
 
 # Make sure we're using pg high enough for PGResult#values
-gem 'pg', '~> 0.11'
+gem 'pg', '~> 0.18'
 require 'pg'
 
 module ActiveRecord
