@@ -335,8 +335,7 @@ module ActiveRecord
         @table_alias_length = 128
 
         connect
-        @statements = StatementPool.new @connection,
-                                        config.fetch(:statement_limit) { 1000 }
+        @statements = StatementPool.new config.fetch(:statement_limit) { 1000 }
 
         @local_tz = execute('SHOW TIME ZONE', 'SCHEMA').first["TimeZone"]
       end
