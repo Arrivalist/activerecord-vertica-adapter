@@ -47,146 +47,146 @@ module ActiveRecord
           return string unless String === string
 
           case string
-          when 'infinity'  then 1.0 / 0.0
-          when '-infinity' then -1.0 / 0.0
-          else
-            super
+            when 'infinity'  then 1.0 / 0.0
+            when '-infinity' then -1.0 / 0.0
+            else
+              super
           end
         end
       end
       # :startdoc:
 
       private
-        def extract_limit(sql_type)
-          case sql_type
-            # vertica uses bigint for any int
-            when /^integer|int|int8|bigint|smallint|tinyint/i; 8
-            else super
-          end
+      def extract_limit(sql_type)
+        case sql_type
+          # vertica uses bigint for any int
+          when /^integer|int|int8|bigint|smallint|tinyint/i; 8
+          else super
         end
+      end
 
-        # Extracts the scale from PostgreSQL-specific data types.
-        def extract_scale(sql_type)
-          # Money type has a fixed scale of 2.
-          sql_type =~ /^money/ ? 2 : super
+      # Extracts the scale from PostgreSQL-specific data types.
+      def extract_scale(sql_type)
+        # Money type has a fixed scale of 2.
+        sql_type =~ /^money/ ? 2 : super
+      end
+
+      # Extracts the precision from PostgreSQL-specific data types.
+      def extract_precision(sql_type)
+        if sql_type == 'money'
+          self.class.money_precision
+        else
+          super
         end
+      end
 
-        # Extracts the precision from PostgreSQL-specific data types.
-        def extract_precision(sql_type)
-          if sql_type == 'money'
-            self.class.money_precision
+      # Maps PostgreSQL-specific data types to logical Rails types.
+      def simplified_type(field_type)
+        case field_type
+          # Numeric and monetary types
+          when /^(?:real|double precision)$/
+            :float
+          # Monetary types
+          when 'money'
+            :decimal
+          # Character types
+          when /^(?:character varying|bpchar)(?:\(\d+\))?$/
+            :string
+          # Binary data types
+          when 'bytea'
+            :binary
+          # Date/time types
+          when /^timestamp with(?:out)? time zone$/
+            :datetime
+          when 'interval'
+            :string
+          # Geometric types
+          when /^(?:point|line|lseg|box|"?path"?|polygon|circle)$/
+            :string
+          # Network address types
+          when /^(?:cidr|inet|macaddr)$/
+            :string
+          # Bit strings
+          when /^bit(?: varying)?(?:\(\d+\))?$/
+            :string
+          # XML type
+          when 'xml'
+            :xml
+          # tsvector type
+          when 'tsvector'
+            :tsvector
+          # Arrays
+          when /^\D+\[\]$/
+            :string
+          # Object identifier types
+          when 'oid'
+            :integer
+          # UUID type
+          when 'uuid'
+            :string
+          # Small and big integer types
+          when /^(?:small|big)int$/
+            :integer
+          # Pass through all types that are not specific to PostgreSQL.
           else
             super
-          end
         end
+      end
 
-        # Maps PostgreSQL-specific data types to logical Rails types.
-        def simplified_type(field_type)
-          case field_type
-            # Numeric and monetary types
-            when /^(?:real|double precision)$/
-              :float
-            # Monetary types
-            when 'money'
-              :decimal
-            # Character types
-            when /^(?:character varying|bpchar)(?:\(\d+\))?$/
-              :string
-            # Binary data types
-            when 'bytea'
-              :binary
-            # Date/time types
-            when /^timestamp with(?:out)? time zone$/
-              :datetime
-            when 'interval'
-              :string
-            # Geometric types
-            when /^(?:point|line|lseg|box|"?path"?|polygon|circle)$/
-              :string
-            # Network address types
-            when /^(?:cidr|inet|macaddr)$/
-              :string
-            # Bit strings
-            when /^bit(?: varying)?(?:\(\d+\))?$/
-              :string
-            # XML type
-            when 'xml'
-              :xml
-            # tsvector type
-            when 'tsvector'
-              :tsvector
-            # Arrays
-            when /^\D+\[\]$/
-              :string
-            # Object identifier types
-            when 'oid'
-              :integer
-            # UUID type
-            when 'uuid'
-              :string
-            # Small and big integer types
-            when /^(?:small|big)int$/
-              :integer
-            # Pass through all types that are not specific to PostgreSQL.
-            else
-              super
-          end
+      # Extracts the value from a PostgreSQL column default definition.
+      def self.extract_value_from_default(default)
+        case default
+          # This is a performance optimization for Ruby 1.9.2 in development.
+          # If the value is nil, we return nil straight away without checking
+          # the regular expressions. If we check each regular expression,
+          # Regexp#=== will call NilClass#to_str, which will trigger
+          # method_missing (defined by whiny nil in ActiveSupport) which
+          # makes this method very very slow.
+          when NilClass
+            nil
+          # Numeric types
+          when /\A\(?(-?\d+(\.\d*)?\)?)\z/
+            $1
+          # Character types
+          when /\A\(?'(.*)'::.*\b(?:character varying|bpchar|text)\z/m
+            $1
+          # Binary data types
+          when /\A'(.*)'::bytea\z/m
+            $1
+          # Date/time types
+          when /\A'(.+)'::(?:time(?:stamp)? with(?:out)? time zone|date)\z/
+            $1
+          when /\A'(.*)'::interval\z/
+            $1
+          # Boolean type
+          when 'true'
+            true
+          when 'false'
+            false
+          # Geometric types
+          when /\A'(.*)'::(?:point|line|lseg|box|"?path"?|polygon|circle)\z/
+            $1
+          # Network address types
+          when /\A'(.*)'::(?:cidr|inet|macaddr)\z/
+            $1
+          # Bit string types
+          when /\AB'(.*)'::"?bit(?: varying)?"?\z/
+            $1
+          # XML type
+          when /\A'(.*)'::xml\z/m
+            $1
+          # Arrays
+          when /\A'(.*)'::"?\D+"?\[\]\z/
+            $1
+          # Object identifier types
+          when /\A-?\d+\z/
+            $1
+          else
+            # Anything else is blank, some user type, or some function
+            # and we can't know the value of that, so return nil.
+            nil
         end
-
-        # Extracts the value from a PostgreSQL column default definition.
-        def self.extract_value_from_default(default)
-          case default
-            # This is a performance optimization for Ruby 1.9.2 in development.
-            # If the value is nil, we return nil straight away without checking
-            # the regular expressions. If we check each regular expression,
-            # Regexp#=== will call NilClass#to_str, which will trigger
-            # method_missing (defined by whiny nil in ActiveSupport) which
-            # makes this method very very slow.
-            when NilClass
-              nil
-            # Numeric types
-            when /\A\(?(-?\d+(\.\d*)?\)?)\z/
-              $1
-            # Character types
-            when /\A\(?'(.*)'::.*\b(?:character varying|bpchar|text)\z/m
-              $1
-            # Binary data types
-            when /\A'(.*)'::bytea\z/m
-              $1
-            # Date/time types
-            when /\A'(.+)'::(?:time(?:stamp)? with(?:out)? time zone|date)\z/
-              $1
-            when /\A'(.*)'::interval\z/
-              $1
-            # Boolean type
-            when 'true'
-              true
-            when 'false'
-              false
-            # Geometric types
-            when /\A'(.*)'::(?:point|line|lseg|box|"?path"?|polygon|circle)\z/
-              $1
-            # Network address types
-            when /\A'(.*)'::(?:cidr|inet|macaddr)\z/
-              $1
-            # Bit string types
-            when /\AB'(.*)'::"?bit(?: varying)?"?\z/
-              $1
-            # XML type
-            when /\A'(.*)'::xml\z/m
-              $1
-            # Arrays
-            when /\A'(.*)'::"?\D+"?\[\]\z/
-              $1
-            # Object identifier types
-            when /\A-?\d+\z/
-              $1
-            else
-              # Anything else is blank, some user type, or some function
-              # and we can't know the value of that, so return nil.
-              nil
-          end
-        end
+      end
     end
 
     # The PostgreSQL adapter works both with the native C (http://ruby.scripting.ca/postgres/) and the pure
@@ -224,21 +224,21 @@ module ActiveRecord
       ADAPTER_NAME = 'Vertica'
 
       NATIVE_DATABASE_TYPES = {
-        :primary_key => "identity primary key",
-        :non_inc_pk  => "integer primary key",
-        :string      => { :name => "varchar", :limit => 255 },
-        :text        => { :name => "varchar", :limit => 65000 },
-        :integer     => { :name => "integer" },
-        :float       => { :name => "float" },
-        :decimal     => { :name => "decimal" },
-        :datetime    => { :name => "timestamp" },
-        :timestamp   => { :name => "timestamp" },
-        :time        => { :name => "time" },
-        :date        => { :name => "date" },
-        :binary      => { :name => "bytea" },
-        :boolean     => { :name => "boolean" },
-        :xml         => { :name => "xml" },
-        :tsvector    => { :name => "tsvector" }
+          :primary_key => "identity primary key",
+          :non_inc_pk  => "integer primary key",
+          :string      => { :name => "varchar", :limit => 255 },
+          :text        => { :name => "varchar", :limit => 65000 },
+          :integer     => { :name => "integer" },
+          :float       => { :name => "float" },
+          :decimal     => { :name => "decimal" },
+          :datetime    => { :name => "timestamp" },
+          :timestamp   => { :name => "timestamp" },
+          :time        => { :name => "time" },
+          :date        => { :name => "date" },
+          :binary      => { :name => "bytea" },
+          :boolean     => { :name => "boolean" },
+          :xml         => { :name => "xml" },
+          :tsvector    => { :name => "tsvector" }
       }
 
       # Returns 'PostgreSQL' as adapter name for identification purposes.
@@ -261,7 +261,7 @@ module ActiveRecord
       end
 
       class StatementPool < ConnectionAdapters::StatementPool
-        def initialize(max)
+        def initialize(connection, max)
           super
           @counter = 0
           @cache   = Hash.new { |h,pid| h[pid] = {} }
@@ -335,7 +335,8 @@ module ActiveRecord
         @table_alias_length = 128
 
         connect
-        @statements = StatementPool.new config.fetch(:statement_limit) { 1000 }
+        @statements = StatementPool.new @connection,
+                                        config.fetch(:statement_limit) { 1000 }
 
         @local_tz = execute('SHOW TIME ZONE', 'SCHEMA').first["TimeZone"]
       end
@@ -434,27 +435,27 @@ module ActiveRecord
         return super unless column
 
         case value
-        when Float
-          return super unless value.infinite? && column.type == :datetime
-          "'#{value.to_s.downcase}'"
-        when Numeric
-          return super unless column.sql_type == 'money'
-          # Not truly string input, so doesn't require (or allow) escape string syntax.
-          "'#{value}'"
-        when String
-          case column.sql_type
-          when 'bytea' then "'#{escape_bytea(value)}'"
-          when 'xml'   then "xml '#{quote_string(value)}'"
-          when /^bit/
-            case value
-            when /^[01]*$/      then "B'#{value}'" # Bit-string notation
-            when /^[0-9A-F]*$/i then "X'#{value}'" # Hexadecimal notation
+          when Float
+            return super unless value.infinite? && column.type == :datetime
+            "'#{value.to_s.downcase}'"
+          when Numeric
+            return super unless column.sql_type == 'money'
+            # Not truly string input, so doesn't require (or allow) escape string syntax.
+            "'#{value}'"
+          when String
+            case column.sql_type
+              when 'bytea' then "'#{escape_bytea(value)}'"
+              when 'xml'   then "xml '#{quote_string(value)}'"
+              when /^bit/
+                case value
+                  when /^[01]*$/      then "B'#{value}'" # Bit-string notation
+                  when /^[0-9A-F]*$/i then "X'#{value}'" # Hexadecimal notation
+                end
+              else
+                super
             end
           else
             super
-          end
-        else
-          super
         end
       end
 
@@ -462,11 +463,11 @@ module ActiveRecord
         return super unless column
 
         case value
-        when String
-          return super unless 'bytea' == column.sql_type
-          { :value => value, :format => 1 }
-        else
-          super
+          when String
+            return super unless 'bytea' == column.sql_type
+            { :value => value, :format => 1 }
+          else
+            super
         end
       end
 
@@ -630,7 +631,7 @@ module ActiveRecord
         integers = typehash[6] || []
         floats   = typehash[16] || []
         floats   += typehash[7] unless typehash[7].nil?
-	strings  = typehash[9] || []
+        strings  = typehash[9] || []
         dates    = typehash[10] || []
         # CJR 11-12-14 not converting boolean, time and timestamp because we don't use them
 
@@ -649,9 +650,9 @@ module ActiveRecord
           dates.each do |index, _|
             row[index] = Date.parse(row[index])
           end
-	  strings.each do |index, _|
-	    row[index] = row[index].force_encoding('UTF-8')
-	  row
+          strings.each do |index, _|
+            row[index] = row[index].force_encoding('UTF-8')
+          end
           # If this is a money type column and there are any currency symbols,
           # then strip them off. Indeed it would be prettier to do this in
           # PostgreSQLColumn.string_to_decimal but would break form input
@@ -663,10 +664,10 @@ module ActiveRecord
             #  (1) $12,345,678.12
             #  (2) $12.345.678,12
             case data
-            when /^-?\D+[\d,]+\.\d{2}$/  # (1)
-              data.gsub!(/[^-\d.]/, '')
-            when /^-?\D+[\d.]+,\d{2}$/  # (2)
-              data.gsub!(/[^-\d,]/, '').sub!(/,/, '.')
+              when /^-?\D+[\d,]+\.\d{2}$/  # (1)
+                data.gsub!(/[^-\d.]/, '')
+              when /^-?\D+[\d.]+,\d{2}$/  # (2)
+                data.gsub!(/[^-\d,]/, '').sub!(/,/, '.')
             end
           end
         end
@@ -701,7 +702,7 @@ module ActiveRecord
       def exec_delete(sql, name = 'SQL', binds = [])
         log(sql, name, binds) do
           result = binds.empty? ? exec_no_cache(sql, binds) :
-                                  exec_cache(sql, binds)
+              exec_cache(sql, binds)
           affected = result.cmd_tuples
           result.clear
           affected
@@ -777,18 +778,18 @@ module ActiveRecord
 
         option_string = options.symbolize_keys.sum do |key, value|
           case key
-          when :owner
-            " OWNER = \"#{value}\""
-          when :template
-            " TEMPLATE = \"#{value}\""
-          # when :encoding
-          #   " ENCODING = '#{value}'"
-          when :tablespace
-            " TABLESPACE = \"#{value}\""
-          when :connection_limit
-            " CONNECTION LIMIT = #{value}"
-          else
-            ""
+            when :owner
+              " OWNER = \"#{value}\""
+            when :template
+              " TEMPLATE = \"#{value}\""
+            # when :encoding
+            #   " ENCODING = '#{value}'"
+            when :tablespace
+              " TABLESPACE = \"#{value}\""
+            when :connection_limit
+              " CONNECTION LIMIT = #{value}"
+            else
+              ""
           end
         end
 
@@ -973,30 +974,30 @@ module ActiveRecord
       # Maps logical Rails types to PostgreSQL-specific data types.
       def type_to_sql(type, limit = nil, precision = nil, scale = nil)
         case type.to_s
-        when 'binary'
-          # PostgreSQL doesn't support limits on binary (bytea) columns.
-          # The hard limit is 1Gb, because of a 32-bit size field, and TOAST.
-          case limit
-            when nil, 0..0x3fffffff; super(type)
-            else raise(ActiveRecordError, "No binary type has byte size #{limit}.")
-          end
-        when 'text'
-          # note: adapted for Vertica
-          case limit
-            when nil, 0..65000; "varchar(#{limit})"
-            else raise(ActiveRecordError, "The limit on varchar in Vertica can be at most 65000 bytes.")
-          end
-        when 'integer'
-          return 'integer' unless limit
+          when 'binary'
+            # PostgreSQL doesn't support limits on binary (bytea) columns.
+            # The hard limit is 1Gb, because of a 32-bit size field, and TOAST.
+            case limit
+              when nil, 0..0x3fffffff; super(type)
+              else raise(ActiveRecordError, "No binary type has byte size #{limit}.")
+            end
+          when 'text'
+            # note: adapted for Vertica
+            case limit
+              when nil, 0..65000; "varchar(#{limit})"
+              else raise(ActiveRecordError, "The limit on varchar in Vertica can be at most 65000 bytes.")
+            end
+          when 'integer'
+            return 'integer' unless limit
 
-          case limit
-            when 1, 2; 'smallint'
-            when 3, 4; 'integer'
-            when 5..8; 'bigint'
-            else raise(ActiveRecordError, "No integer type has byte size #{limit}. Use a numeric with precision 0 instead.")
-          end
-        else
-          super
+            case limit
+              when 1, 2; 'smallint'
+              when 3, 4; 'integer'
+              when 5..8; 'bigint'
+              else raise(ActiveRecordError, "No integer type has byte size #{limit}. Use a numeric with precision 0 instead.")
+            end
+          else
+            super
         end
       end
 
@@ -1043,194 +1044,194 @@ module ActiveRecord
       end
 
       protected
-        def extract_limit(sql_type) # :nodoc:
-          case sql_type
-            when /^int/i
-              8
-            when /\((.*)\)/
-              $1.to_i
-          end
+      def extract_limit(sql_type) # :nodoc:
+        case sql_type
+          when /^int/i
+            8
+          when /\((.*)\)/
+            $1.to_i
         end
+      end
 
-        # FIXME: Double check this on Vertica
-        # Returns the version of the connected PostgreSQL server.
-        def postgresql_version
-          @connection.server_version
-        end
+      # FIXME: Double check this on Vertica
+      # Returns the version of the connected PostgreSQL server.
+      def postgresql_version
+        @connection.server_version
+      end
 
-        # See http://www.postgresql.org/docs/9.1/static/errcodes-appendix.html
-        FOREIGN_KEY_VIOLATION = "23503"
-        UNIQUE_VIOLATION      = "23505"
+      # See http://www.postgresql.org/docs/9.1/static/errcodes-appendix.html
+      FOREIGN_KEY_VIOLATION = "23503"
+      UNIQUE_VIOLATION      = "23505"
 
-        # def translate_exception(exception, message)
-        #   case exception.result.error_field(PGresult::PG_DIAG_SQLSTATE)
-        #   when UNIQUE_VIOLATION
-        #     RecordNotUnique.new(message, exception)
-        #   when FOREIGN_KEY_VIOLATION
-        #     InvalidForeignKey.new(message, exception)
-        #   else
-        #     super
-        #   end
-        # end
+      # def translate_exception(exception, message)
+      #   case exception.result.error_field(PGresult::PG_DIAG_SQLSTATE)
+      #   when UNIQUE_VIOLATION
+      #     RecordNotUnique.new(message, exception)
+      #   when FOREIGN_KEY_VIOLATION
+      #     InvalidForeignKey.new(message, exception)
+      #   else
+      #     super
+      #   end
+      # end
 
       private
-        FEATURE_NOT_SUPPORTED = "0A000" # :nodoc:
+      FEATURE_NOT_SUPPORTED = "0A000" # :nodoc:
 
-        def exec_no_cache(sql, binds)
-          @connection.async_exec(sql)
-        end
+      def exec_no_cache(sql, binds)
+        @connection.async_exec(sql)
+      end
 
-        def exec_cache(sql, binds)
-          begin
-            stmt_key = prepare_statement sql
+      def exec_cache(sql, binds)
+        begin
+          stmt_key = prepare_statement sql
 
-            # Clear the queue
-            @connection.get_last_result
-            @connection.send_query_prepared(stmt_key, binds.map { |col, val|
-              type_cast(val, col)
-            })
-            @connection.block
-            @connection.get_last_result
-          rescue PGError => e
-            # Get the PG code for the failure.  Annoyingly, the code for
-            # prepared statements whose return value may have changed is
-            # FEATURE_NOT_SUPPORTED.  Check here for more details:
-            # http://git.postgresql.org/gitweb/?p=postgresql.git;a=blob;f=src/backend/utils/cache/plancache.c#l573
-            code = e.result.result_error_field(PGresult::PG_DIAG_SQLSTATE)
-            if FEATURE_NOT_SUPPORTED == code
-              @statements.delete sql_key(sql)
-              retry
-            else
-              raise e
-            end
+          # Clear the queue
+          @connection.get_last_result
+          @connection.send_query_prepared(stmt_key, binds.map { |col, val|
+            type_cast(val, col)
+          })
+          @connection.block
+          @connection.get_last_result
+        rescue PGError => e
+          # Get the PG code for the failure.  Annoyingly, the code for
+          # prepared statements whose return value may have changed is
+          # FEATURE_NOT_SUPPORTED.  Check here for more details:
+          # http://git.postgresql.org/gitweb/?p=postgresql.git;a=blob;f=src/backend/utils/cache/plancache.c#l573
+          code = e.result.result_error_field(PGresult::PG_DIAG_SQLSTATE)
+          if FEATURE_NOT_SUPPORTED == code
+            @statements.delete sql_key(sql)
+            retry
+          else
+            raise e
           end
         end
+      end
 
-        # Returns the statement identifier for the client side cache
-        # of statements
-        def sql_key(sql)
-          "#{schema_search_path}-#{sql}"
+      # Returns the statement identifier for the client side cache
+      # of statements
+      def sql_key(sql)
+        "#{schema_search_path}-#{sql}"
+      end
+
+      # Prepare the statement if it hasn't been prepared, return
+      # the statement key.
+      def prepare_statement(sql)
+        sql_key = sql_key(sql)
+        unless @statements.key? sql_key
+          nextkey = @statements.next_key
+          @connection.prepare nextkey, sql
+          @statements[sql_key] = nextkey
+        end
+        @statements[sql_key]
+      end
+
+      # The internal PostgreSQL identifier of the money data type.
+      MONEY_COLUMN_TYPE_OID = 790 #:nodoc:
+      # The internal PostgreSQL identifier of the BYTEA data type.
+      BYTEA_COLUMN_TYPE_OID = 17 #:nodoc:
+
+      # Connects to a PostgreSQL server and sets up the adapter depending on the
+      # connected server's characteristics.
+      def connect
+        @connection = PGconn.connect(*@connection_parameters)
+
+        # Money type has a fixed precision of 10 in PostgreSQL 8.2 and below, and as of
+        # PostgreSQL 8.3 it has a fixed precision of 19. PostgreSQLColumn.extract_precision
+        # should know about this but can't detect it there, so deal with it here.
+        VerticaColumn.money_precision = (postgresql_version >= 80300) ? 19 : 10
+
+        configure_connection
+      end
+
+      # Configures the encoding, verbosity, schema search path, and time zone of the connection.
+      # This is called by #connect and should not be called manually.
+      def configure_connection
+        # if @config[:encoding]
+        #   @connection.set_client_encoding(@config[:encoding])
+        # end
+        self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
+
+        # Use standard-conforming strings if available so we don't have to do the E'...' dance.
+        set_standard_conforming_strings
+
+        # If using Active Record's time zone support configure the connection to return
+        # TIMESTAMP WITH ZONE types in UTC.
+        if ActiveRecord::Base.default_timezone == :utc
+          execute("SET time zone 'UTC'", 'SCHEMA')
+        elsif @local_tz
+          execute("SET time zone '#{@local_tz}'", 'SCHEMA')
         end
 
-        # Prepare the statement if it hasn't been prepared, return
-        # the statement key.
-        def prepare_statement(sql)
-          sql_key = sql_key(sql)
-          unless @statements.key? sql_key
-            nextkey = @statements.next_key
-            @connection.prepare nextkey, sql
-            @statements[sql_key] = nextkey
-          end
-          @statements[sql_key]
-        end
+        execute("SET SESSION AUTOCOMMIT TO  ON")
 
-        # The internal PostgreSQL identifier of the money data type.
-        MONEY_COLUMN_TYPE_OID = 790 #:nodoc:
-        # The internal PostgreSQL identifier of the BYTEA data type.
-        BYTEA_COLUMN_TYPE_OID = 17 #:nodoc:
+      end
 
-        # Connects to a PostgreSQL server and sets up the adapter depending on the
-        # connected server's characteristics.
-        def connect
-          @connection = PGconn.connect(*@connection_parameters)
+      # Returns the current ID of a table's id.
+      def last_insert_id(sequence_name) #:nodoc:
+        r = exec_query("SELECT currval('id')", 'SQL')
+        Integer(r.rows.first.first)
+      end
 
-          # Money type has a fixed precision of 10 in PostgreSQL 8.2 and below, and as of
-          # PostgreSQL 8.3 it has a fixed precision of 19. PostgreSQLColumn.extract_precision
-          # should know about this but can't detect it there, so deal with it here.
-          VerticaColumn.money_precision = (postgresql_version >= 80300) ? 19 : 10
+      def select_raw(sql, name = nil)
+        res = execute(sql, name)
+        results = result_as_array(res)
+        fields = res.fields
+        res.clear
+        return fields, results
+      end
 
-          configure_connection
-        end
-
-        # Configures the encoding, verbosity, schema search path, and time zone of the connection.
-        # This is called by #connect and should not be called manually.
-        def configure_connection
-          # if @config[:encoding]
-          #   @connection.set_client_encoding(@config[:encoding])
-          # end
-          self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
-
-          # Use standard-conforming strings if available so we don't have to do the E'...' dance.
-          set_standard_conforming_strings
-
-          # If using Active Record's time zone support configure the connection to return
-          # TIMESTAMP WITH ZONE types in UTC.
-          if ActiveRecord::Base.default_timezone == :utc
-            execute("SET time zone 'UTC'", 'SCHEMA')
-          elsif @local_tz
-            execute("SET time zone '#{@local_tz}'", 'SCHEMA')
-          end
-
-          execute("SET SESSION AUTOCOMMIT TO  ON")
-
-        end
-
-        # Returns the current ID of a table's id.
-        def last_insert_id(sequence_name) #:nodoc:
-          r = exec_query("SELECT currval('id')", 'SQL')
-          Integer(r.rows.first.first)
-        end
-
-        def select_raw(sql, name = nil)
-          res = execute(sql, name)
-          results = result_as_array(res)
-          fields = res.fields
-          res.clear
-          return fields, results
-        end
-
-        # Returns the list of a table's column names, data types, and default values.
-        #
-        # The underlying query is roughly:
-        #  SELECT column.name, column.type, default.value
-        #    FROM column LEFT JOIN default
-        #      ON column.table_id = default.table_id
-        #     AND column.num = default.column_num
-        #   WHERE column.table_id = get_table_id('table_name')
-        #     AND column.num > 0
-        #     AND NOT column.is_dropped
-        #   ORDER BY column.num
-        #
-        # If the table name is not prefixed with a schema, the database will
-        # use the current schema
-        #
-        # Query implementation notes:
-        #  - format_type includes the column size constraint, e.g. varchar(50)
-        #  - ::regclass is a function that gives the id for a table name
-        def column_definitions(table_name) #:nodoc:
-          schema, name = get_schema_and_name(table_name)
-          exec_query(<<-end_sql, 'SCHEMA').rows
+      # Returns the list of a table's column names, data types, and default values.
+      #
+      # The underlying query is roughly:
+      #  SELECT column.name, column.type, default.value
+      #    FROM column LEFT JOIN default
+      #      ON column.table_id = default.table_id
+      #     AND column.num = default.column_num
+      #   WHERE column.table_id = get_table_id('table_name')
+      #     AND column.num > 0
+      #     AND NOT column.is_dropped
+      #   ORDER BY column.num
+      #
+      # If the table name is not prefixed with a schema, the database will
+      # use the current schema
+      #
+      # Query implementation notes:
+      #  - format_type includes the column size constraint, e.g. varchar(50)
+      #  - ::regclass is a function that gives the id for a table name
+      def column_definitions(table_name) #:nodoc:
+        schema, name = get_schema_and_name(table_name)
+        exec_query(<<-end_sql, 'SCHEMA').rows
             SELECT column_name, data_type, column_default, is_nullable
             FROM columns
             WHERE table_name = '#{name}'
             AND table_schema = '#{schema}'
-          end_sql
-        end
+        end_sql
+      end
 
-        def extract_pg_identifier_from_name(name)
-          match_data = name.start_with?('"') ? name.match(/\"([^\"]+)\"/) : name.match(/([^\.]+)/)
+      def extract_pg_identifier_from_name(name)
+        match_data = name.start_with?('"') ? name.match(/\"([^\"]+)\"/) : name.match(/([^\.]+)/)
 
-          if match_data
-            rest = name[match_data[0].length, name.length]
-            rest = rest[1, rest.length] if rest.start_with? "."
-            [match_data[1], (rest.length > 0 ? rest : nil)]
-          end
+        if match_data
+          rest = name[match_data[0].length, name.length]
+          rest = rest[1, rest.length] if rest.start_with? "."
+          [match_data[1], (rest.length > 0 ? rest : nil)]
         end
+      end
 
-        def extract_table_ref_from_insert_sql(sql)
-          sql[/into\s+([^\(]*).*values\s*\(/i]
-          $1.strip if $1
-        end
+      def extract_table_ref_from_insert_sql(sql)
+        sql[/into\s+([^\(]*).*values\s*\(/i]
+        $1.strip if $1
+      end
 
-        def table_definition
-          TableDefinition.new(self)
-        end
+      def table_definition
+        TableDefinition.new(self)
+      end
 
-        def get_schema_and_name(name)
-          schema, table = Utils.extract_schema_and_table(name)
-          schema = current_schema if schema.nil?
-          [schema, table]
-        end
+      def get_schema_and_name(name)
+        schema, table = Utils.extract_schema_and_table(name)
+        schema = current_schema if schema.nil?
+        [schema, table]
+      end
 
     end
   end
