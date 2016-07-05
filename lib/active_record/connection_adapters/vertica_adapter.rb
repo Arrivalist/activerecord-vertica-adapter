@@ -610,7 +610,7 @@ module ActiveRecord
 
         # CJR 11-12-14 We need to convert everything other than string because
         # everything is coming back as string (we are not converting char(8) or varchar(9))
-        convert_types = {boolean: 5, integer: 6, float: 7, string:9, numeric: 16, date: 10, time: 11, timestamp: 12}
+        convert_types = {boolean: 5, integer: 6, float: 7, string: 9, numeric: 16, date: 10, time: 11, timestamp: 12}
 
         # check if we have any binary column and if they need escaping
         ftypes = Array.new(res.nfields) do |i|
