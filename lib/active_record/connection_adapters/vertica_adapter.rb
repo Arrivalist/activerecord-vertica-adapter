@@ -650,7 +650,7 @@ module ActiveRecord
             row[index] = Date.parse(row[index])
           end
           strings.each do |index, _|
-            row[index] = row[index].force_encoding('UTF-8')
+            row[index] = row[index].force_encoding('UTF-8') if row[index]
           end
           # If this is a money type column and there are any currency symbols,
           # then strip them off. Indeed it would be prettier to do this in
