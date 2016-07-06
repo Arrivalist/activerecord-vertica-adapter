@@ -681,14 +681,7 @@ module ActiveRecord
 
       def exec_query(sql, name = 'SQL', binds = [], prepare: false)
         execute_and_clear(sql, name, binds, prepare: prepare) do |result|
-          types = {}
-          fields = result.fields
-          fields.each_with_index do |fname, i|
-            ftype = result.ftype i
-            fmod  = result.fmod i
-            types[fname] = get_oid_type(ftype, fmod, fname)
-          end
-          ActiveRecord::Result.new(fields, result.values, types)
+          ActiveRecord::Result.new(result.fields, result_as_array(result))
         end
       end
 
