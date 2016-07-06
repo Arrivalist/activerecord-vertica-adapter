@@ -40,6 +40,10 @@ module ActiveRecord
         super(name, self.class.extract_value_from_default(default), sql_type, null)
       end
 
+      def sql_type
+        super.gsub(/\[\]$/, "".freeze)
+      end
+
       # :stopdoc:
       class << self
         attr_accessor :money_precision
