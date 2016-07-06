@@ -794,6 +794,27 @@ module ActiveRecord
       end
 
       # Returns the list of all tables in the specified or current schema, if none specified.
+      def views(name = nil)
+        query(<<-SQL, 'SCHEMA').map { |row| row[0] }
+          SELECT table_name FROM views
+          WHERE table_schema = '#{current_schema}';
+        SQL
+      end
+
+      # Returns true if table exists.
+      # If the schema is not specified as part of +name+ then it will only find tables within
+      # the current schema (regardless of permissions to access tables in other schemas)
+      def views_exists?(name)
+        schema, name = get_schema_and_name(name)
+        exec_query(<<-SQL, 'SCHEMA').rows.first[0].to_i > 0
+          SELECT COUNT(*)
+          FROM tables
+          WHERE table_name = '#{name}'
+          AND table_schema = '#{schema}'
+        SQL
+      end
+
+      # Returns the list of all tables in the specified or current schema, if none specified.
       def tables(name = nil)
         query(<<-SQL, 'SCHEMA').map { |row| row[0] }
           SELECT table_name FROM tables
