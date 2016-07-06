@@ -57,6 +57,20 @@ module ActiveRecord
       # :startdoc:
 
       private
+
+      def execute_and_clear(sql, name, binds, prepare: false)
+        if without_prepared_statement?(binds)
+          result = exec_no_cache(sql, name, [])
+        elsif !prepare
+          result = exec_no_cache(sql, name, binds)
+        else
+          result = exec_cache(sql, name, binds)
+        end
+        ret = yield result
+        result.clear
+        ret
+      end
+
       def extract_limit(sql_type)
         case sql_type
           # vertica uses bigint for any int
@@ -688,24 +702,21 @@ module ActiveRecord
         end
       end
 
-      def exec_query(sql, name = 'SQL', binds = [])
-        log(sql, name, binds) do
-          result = without_prepared_statement?(binds) ? exec_no_cache(sql, binds) : exec_cache(sql, binds)
-
-          ret = ActiveRecord::Result.new(result.fields, result_as_array(result))
-          result.clear
-          return ret
+      def exec_query(sql, name = 'SQL', binds = [], prepare: false)
+        execute_and_clear(sql, name, binds, prepare: prepare) do |result|
+          types = {}
+          fields = result.fields
+          fields.each_with_index do |fname, i|
+            ftype = result.ftype i
+            fmod  = result.fmod i
+            types[fname] = get_oid_type(ftype, fmod, fname)
+          end
+          ActiveRecord::Result.new(fields, result.values, types)
         end
       end
 
       def exec_delete(sql, name = 'SQL', binds = [])
-        log(sql, name, binds) do
-          result = binds.empty? ? exec_no_cache(sql, binds) :
-              exec_cache(sql, binds)
-          affected = result.cmd_tuples
-          result.clear
-          affected
-        end
+        execute_and_clear(sql, name, binds) {|result| result.cmd_tuples }
       end
       alias :exec_update :exec_delete
 
