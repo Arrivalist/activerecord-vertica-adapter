@@ -41,7 +41,7 @@ module ActiveRecord
       end
 
       def sql_type
-        super.gsub(/\[\]$/, "".freeze)
+        type.gsub(/\[\]$/, "".freeze)
       end
 
       # :stopdoc:
