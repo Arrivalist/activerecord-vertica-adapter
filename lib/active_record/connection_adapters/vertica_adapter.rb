@@ -58,19 +58,6 @@ module ActiveRecord
 
       private
 
-      def execute_and_clear(sql, name, binds, prepare: false)
-        if without_prepared_statement?(binds)
-          result = exec_no_cache(sql, name, [])
-        elsif !prepare
-          result = exec_no_cache(sql, name, binds)
-        else
-          result = exec_cache(sql, name, binds)
-        end
-        ret = yield result
-        result.clear
-        ret
-      end
-
       def extract_limit(sql_type)
         case sql_type
           # vertica uses bigint for any int
@@ -472,7 +459,7 @@ module ActiveRecord
         end
       end
 
-      def type_cast(value, column)
+      def type_cast(value, column = nil)
         return super unless column
 
         case value
@@ -1087,33 +1074,42 @@ module ActiveRecord
       private
       FEATURE_NOT_SUPPORTED = "0A000" # :nodoc:
 
-      def exec_no_cache(sql, binds)
-        @connection.async_exec(sql)
+      def execute_and_clear(sql, name, binds, prepare: false)
+        if without_prepared_statement?(binds)
+          result = exec_no_cache(sql, name, [])
+        elsif !prepare
+          result = exec_no_cache(sql, name, binds)
+        else
+          result = exec_cache(sql, name, binds)
+        end
+        ret = yield result
+        result.clear
+        ret
       end
 
-      def exec_cache(sql, binds)
-        begin
-          stmt_key = prepare_statement sql
+      def exec_no_cache(sql, name, binds)
+        type_casted_binds = binds.map { |attr| type_cast(attr.value_for_database) }
+        log(sql, name, binds) { @connection.async_exec(sql, type_casted_binds) }
+      end
 
-          # Clear the queue
-          @connection.get_last_result
-          @connection.send_query_prepared(stmt_key, binds.map { |col, val|
-            type_cast(val, col)
-          })
-          @connection.block
-          @connection.get_last_result
-        rescue PGError => e
-          # Get the PG code for the failure.  Annoyingly, the code for
-          # prepared statements whose return value may have changed is
-          # FEATURE_NOT_SUPPORTED.  Check here for more details:
-          # http://git.postgresql.org/gitweb/?p=postgresql.git;a=blob;f=src/backend/utils/cache/plancache.c#l573
-          code = e.result.result_error_field(PGresult::PG_DIAG_SQLSTATE)
-          if FEATURE_NOT_SUPPORTED == code
-            @statements.delete sql_key(sql)
-            retry
-          else
-            raise e
-          end
+      def exec_cache(sql, name, binds)
+        stmt_key = prepare_statement(sql)
+        type_casted_binds = binds.map { |attr| type_cast(attr.value_for_database) }
+
+        log(sql, name, binds, stmt_key) do
+          @connection.exec_prepared(stmt_key, type_casted_binds)
+        end
+      rescue ActiveRecord::StatementInvalid => e
+        raise unless is_cached_plan_failure?(e)
+
+        # Nothing we can do if we are in a transaction because all commands
+        # will raise InFailedSQLTransaction
+        if in_transaction?
+          raise ActiveRecord::PreparedStatementCacheExpired.new(e.cause.message)
+        else
+          # outside of transactions we can simply flush this query and retry
+          @statements.delete sql_key(sql)
+          retry
         end
       end
 
