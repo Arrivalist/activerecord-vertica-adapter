@@ -684,6 +684,7 @@ module ActiveRecord
       end
 
       def exec_query(sql, name = 'SQL', binds = [], prepare: false)
+        logger.info(sql)
         execute_and_clear(sql, name, binds, prepare: prepare) do |result|
           ActiveRecord::Result.new(result.fields, result_as_array(result))
         end
