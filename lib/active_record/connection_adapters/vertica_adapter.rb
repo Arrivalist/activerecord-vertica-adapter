@@ -435,8 +435,8 @@ module ActiveRecord
       end
 
       # Quotes PostgreSQL-specific data types for SQL input.
-      def quote(value, column = nil) #:nodoc:
-        return super unless column
+      def quote(value) #:nodoc:
+        # return super unless column
 
         case value
           when Float
