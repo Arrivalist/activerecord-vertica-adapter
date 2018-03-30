@@ -436,31 +436,32 @@ module ActiveRecord
 
       # Quotes PostgreSQL-specific data types for SQL input.
       def quote(value) #:nodoc:
+        return super
         # return super unless column
 
-        case value
-          when Float
-            return super unless value.infinite? && column.type == :datetime
-            "'#{value.to_s.downcase}'"
-          when Numeric
-            return super unless column.sql_type == 'money'
-            # Not truly string input, so doesn't require (or allow) escape string syntax.
-            "'#{value}'"
-          when String
-            case column.sql_type
-              when 'bytea' then "'#{escape_bytea(value)}'"
-              when 'xml'   then "xml '#{quote_string(value)}'"
-              when /^bit/
-                case value
-                  when /^[01]*$/      then "B'#{value}'" # Bit-string notation
-                  when /^[0-9A-F]*$/i then "X'#{value}'" # Hexadecimal notation
-                end
-              else
-                super
-            end
-          else
-            super
-        end
+        # case value
+        #   when Float
+        #     return super unless value.infinite? && column.type == :datetime
+        #     "'#{value.to_s.downcase}'"
+        #   when Numeric
+        #     return super unless column.sql_type == 'money'
+        #     # Not truly string input, so doesn't require (or allow) escape string syntax.
+        #     "'#{value}'"
+        #   when String
+        #     case column.sql_type
+        #       when 'bytea' then "'#{escape_bytea(value)}'"
+        #       when 'xml'   then "xml '#{quote_string(value)}'"
+        #       when /^bit/
+        #         case value
+        #           when /^[01]*$/      then "B'#{value}'" # Bit-string notation
+        #           when /^[0-9A-F]*$/i then "X'#{value}'" # Hexadecimal notation
+        #         end
+        #       else
+        #         super
+        #     end
+        #   else
+        #     super
+        # end
       end
 
       def type_cast(value, column = nil)
