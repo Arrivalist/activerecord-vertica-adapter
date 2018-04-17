@@ -1,11 +1,6 @@
 require 'active_record/connection_adapters/abstract_adapter'
 require 'active_support/core_ext/object/blank'
 require 'active_record/connection_adapters/statement_pool'
-require 'arel/visitors/bind_visitor'
-
-# Make sure we're using pg high enough for PGResult#values
-gem 'pg', '~> 0.18'
-require 'pg'
 
 module ActiveRecord
   class Base
@@ -311,14 +306,13 @@ module ActiveRecord
         end
 
         def connection_active?
-          @connection.status == PGconn::CONNECTION_OK
+          @connection.status == PG::Constants::CONNECTION_OK
         rescue PGError
           false
         end
       end
 
       class BindSubstitution < Arel::Visitors::PostgreSQL # :nodoc:
-        include Arel::Visitors::BindVisitor
       end
 
       # Initializes and connects a PostgreSQL adapter.
@@ -1153,7 +1147,7 @@ module ActiveRecord
       # Connects to a PostgreSQL server and sets up the adapter depending on the
       # connected server's characteristics.
       def connect
-        @connection = PGconn.connect(*@connection_parameters)
+        @connection = PG.connect(*@connection_parameters)
 
         # Money type has a fixed precision of 10 in PostgreSQL 8.2 and below, and as of
         # PostgreSQL 8.3 it has a fixed precision of 19. PostgreSQLColumn.extract_precision
