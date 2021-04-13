@@ -18,7 +18,7 @@ module ActiveRecord
         raise ArgumentError, "No database specified. Missing argument: database."
       end
 
-      # The postgres drivers don't allow the creation of an unconnected PGconn object,
+      # The postgres drivers don't allow the creation of an unconnected PG object,
       # so just pass a nil connection object for the time being.
       # The order the options are passed to the ::connect method. (in pg/connection.rb)
       #CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password]
@@ -501,7 +501,7 @@ module ActiveRecord
 
       # Quotes column names for use in SQL queries.
       def quote_column_name(name) #:nodoc:
-        PGconn.quote_ident(name.to_s)
+        PG.quote_ident(name.to_s)
       end
 
       # Set the authorized user for this session
@@ -722,7 +722,7 @@ module ActiveRecord
       end
 
       def outside_transaction?
-        @connection.transaction_status == PGconn::PQTRANS_IDLE
+        @connection.transaction_status == PG::PQTRANS_IDLE
       end
 
       def create_savepoint(name = nil)
